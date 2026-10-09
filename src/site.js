@@ -239,13 +239,21 @@ fontsReady.then(() => {
 });
 
 rig.visible = false;
-stage.loadModel().then(({ model }) => {
+stage.loadModel().then(async ({ model }) => {
   rig.add(model);
+  if (!startStep) {
+    base.pos.copy(entryPose.pos); // parked above the frame while the GPU warms up
+    base.quat.copy(entryPose.quat);
+  }
   rig.visible = true;
+  // Upload the textures (~590 MB with mips) and compile shaders before the first frame needs them;
+  // otherwise that multi-second stall swallows the start of the entry flight.
+  model.traverse((o) => {
+    if (o.material) for (const v of Object.values(o.material)) if (v?.isTexture) renderer.initTexture(v);
+  });
+  await renderer.compileAsync(scene, camera);
   modelReady = true;
   if (startStep) return; // deep link (?step=N) shows the pose straight away
-  base.pos.copy(entryPose.pos);
-  base.quat.copy(entryPose.quat);
   flyTo(poses[current], ENTRY_DURATION, easeOutCubic);
   stage.boostStart();
   setTimeout(stage.boostEnd, ENTRY_DURATION * 700);
