@@ -1,19 +1,92 @@
 <!doctype html>
-<html lang="uk">
+<html lang="en" class="is-loading">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Wilco — MQ-9 test scene</title>
-    <style>
-      html, body { margin: 0; height: 100%; background: #0e0f11; overflow: hidden; }
-      canvas { display: block; width: 100vw; height: 100vh; }
-    </style>
+    <title>Wilco Defense — Next-generation maintenance platform</title>
+    <link rel="icon" href="/ui/logo.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Stack+Sans+Headline:wght@400;500&family=Stack+Sans+Text:wght@300;400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/site.css" />
   </head>
-  <body>
+  <body data-step="0">
     <!--
-      Model: "MQ-9 Reaper" (https://sketchfab.com/3d-models/mq-9-reaper-eff549610fee4f20904f7b388a3a0830)
+      3D model: "MQ-9 Reaper" (https://sketchfab.com/3d-models/mq-9-reaper-eff549610fee4f20904f7b388a3a0830)
       by Tyler V Howell (https://sketchfab.com/TVHowell), CC-BY-4.0 — credit required wherever it is shown.
     -->
-    <script type="module" src="/src/main.js"></script>
+    <canvas class="stage" aria-hidden="true"></canvas>
+
+    <header class="head">
+      <div class="head__brand intro" style="--d: 0">
+        <a class="head__logo" href="#" aria-label="Wilco home"><img src="/ui/logo.svg" alt="wilco" /></a>
+        <span class="head__divider" aria-hidden="true"></span>
+        <button class="drop drop--brand" type="button">Defense <img src="/ui/chevron-20.svg" alt="" /></button>
+      </div>
+      <nav class="head__menu">
+        <button class="drop intro" style="--d: 1" type="button">Products <img src="/ui/chevron-18.svg" alt="" /></button>
+        <button class="drop intro" style="--d: 2" type="button">Company <img src="/ui/chevron-18.svg" alt="" /></button>
+        <button class="drop intro" style="--d: 3" type="button">Resources <img src="/ui/chevron-18.svg" alt="" /></button>
+        <a class="drop intro" style="--d: 4" href="#">Contact us</a>
+      </nav>
+      <div class="head__cta intro" style="--d: 5">
+        <a class="btn" href="#">Book a demo</a>
+      </div>
+    </header>
+
+    <main class="slides">
+      <p class="lead" aria-hidden="false">
+        Maintenance coordination today depends too heavily on manual processes, fragmented tools, and individual
+        memory – introducing systemic risk into critical operations.
+      </p>
+
+      <h1 class="slide slide--1 is-active" data-step="0">
+        <span class="ln"><span style="--i: 0">Next-generation</span></span>
+        <span class="ln"><span style="--i: 1">maintenance platform.</span></span>
+      </h1>
+      <h2 class="slide slide--2" data-step="1">
+        <span class="ln"><span style="--i: 0">Unparalleled visibility</span></span>
+        <span class="ln"><span style="--i: 1">without causing a</span></span>
+        <span class="ln"><span style="--i: 2">bottleneck</span></span>
+      </h2>
+      <h2 class="slide slide--3" data-step="2">
+        <span class="ln"><span style="--i: 0">Real-time access for</span></span>
+        <span class="ln"><span style="--i: 1">people in the office</span></span>
+        <span class="ln"><span style="--i: 2">or on the move</span></span>
+      </h2>
+      <h2 class="slide slide--4" data-step="3">
+        <span class="ln"><span style="--i: 0">Increased clarity</span></span>
+        <span class="ln"><span style="--i: 1">across workflows</span></span>
+      </h2>
+      <h2 class="slide slide--5" data-step="4">
+        <span class="ln"><span style="--i: 0">Wilco fixes that with real-time data,</span></span>
+        <span class="ln"><span style="--i: 1">smart coordination, and decision</span></span>
+        <span class="ln"><span style="--i: 2">support at every level.</span></span>
+      </h2>
+    </main>
+
+    <button class="cue intro intro--up" style="--d: 7" type="button" aria-label="Next screen">
+      <span class="cue__circle">
+        <span class="cue__arrow">
+          <svg viewBox="0 0 22 30" aria-hidden="true"><path d="M11 1V29M0.5 18.5 11 29l10.5-10.5" /></svg>
+        </span>
+      </span>
+      <span class="cue__labels">
+        <span class="cue__label cue__label--next">Explore platform</span>
+        <span class="cue__label cue__label--top">Scroll Up</span>
+      </span>
+    </button>
+
+    <div class="progress intro intro--up" style="--d: 8" aria-label="Screen progress">
+      <p class="progress__count"><span class="progress__now">01</span> <span class="progress__of">of 05</span></p>
+      <div class="progress__bars">
+        <span class="is-on"></span><span></span><span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <script type="module" src="/src/site.js"></script>
   </body>
 </html>
