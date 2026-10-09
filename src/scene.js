@@ -4,7 +4,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 // ---- Tunables ----
-export const MODEL_URL = '/models/mq-9_reaper.glb';
+// BASE_URL is '/' in dev and '/wilco-defense-concept/' on GitHub Pages.
+export const MODEL_URL = `${import.meta.env.BASE_URL}models/mq-9_reaper.glb`;
 const EXPOSURE = 0.9;
 const ENV_INTENSITY = 0.7; // studio env is fill only; form comes from KEY/RIM. Raised from 0.45 to offset the tint
 const ENV_TINT = 0xb4cbf2; // multiplies the studio room: blue fill in shadows and blue in reflections

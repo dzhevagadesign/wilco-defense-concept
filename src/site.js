@@ -150,7 +150,7 @@ function renderStepUI(i) {
   body.dataset.step = String(i);
   counter.textContent = String(i + 1).padStart(2, '0');
   bars.forEach((b, j) => b.classList.toggle('is-on', j <= i));
-  if (overlay) overlay.style.backgroundImage = `url(/design/step${i + 1}.png)`;
+  if (overlay) overlay.style.backgroundImage = `url(${import.meta.env.BASE_URL}design/step${i + 1}.png)`;
 }
 
 function goTo(i, { instant = false } = {}) {

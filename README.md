@@ -1,5 +1,7 @@
 # Wilco Defense — desktop concept
 
+Live: https://dzhevagadesign.github.io/wilco-defense-concept/ (desktop; deployed from `main` by GitHub Actions)
+
 Five-screen scroll concept with a real-time MQ-9 Reaper (three.js + Vite). The plane changes pose on every
 screen, leans towards the cursor, and spins its propeller up while the screen changes.
 
