@@ -1,0 +1,11 @@
+Model Information:
+* title:	MQ-9 Reaper
+* source:	https://sketchfab.com/3d-models/mq-9-reaper-eff549610fee4f20904f7b388a3a0830
+* author:	Tyler V Howell (https://sketchfab.com/TVHowell)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "MQ-9 Reaper" (https://sketchfab.com/3d-models/mq-9-reaper-eff549610fee4f20904f7b388a3a0830) by Tyler V Howell (https://sketchfab.com/TVHowell) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
