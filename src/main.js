@@ -27,6 +27,18 @@ const PAINT_TWEAKS = {
   Wing_mat: { color: PAINT_COLOR, roughness: 0.55, metalness: 0.2 },
 };
 
+// Propeller: always idles, spins up while the user drags/zooms, eases back after.
+// 3 blades → the picture repeats every 120°; keep per-frame turn well under 60° (≈10 rev/s at 60 fps)
+// or the prop strobes and looks like it runs backwards.
+const PROP_MESHES = ['defaultMaterial_23', 'defaultMaterial_24']; // spinner, blades
+const PROP_HUB = [-2.682, 0.0143, 0]; // world-space hub centre (spinner bbox centre; blades sit at 120° around it)
+const PROP_AXIS = [1, 0, 0]; // world-space: fuselage axis, nose +X
+const PROP_IDLE_RPS = 1.2; // revolutions per second
+const PROP_BOOST_RPS = 4.5;
+const PROP_SPIN_UP = 0.6; // s, time constant towards boost
+const PROP_SPIN_DOWN = 1.4; // s, time constant back to idle
+const PROP_BOOST_HOLD = 0.8; // s the boost lingers after an interaction ends (a wheel tick starts and ends at once)
+
 // ---- Renderer ----
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -80,10 +92,45 @@ new GLTFLoader().load(MODEL_URL, (gltf) => {
 
   const box = new THREE.Box3().setFromObject(model);
   fitCamera(model, box);
+  setupPropeller(model);
 
   // Log after the first frame so renderer.info reflects real uploads/draws.
   requestAnimationFrame(() => report(gltf, box));
 }, undefined, (err) => console.error('GLB load failed:', err));
+
+// ---- Propeller ----
+// The GLB pivots every mesh at the world origin, so the prop is re-parented under a pivot at the hub.
+const prop = { pivot: null, axis: new THREE.Vector3(), rps: PROP_IDLE_RPS, pressed: false, holdLeft: 0 };
+
+function setupPropeller(model) {
+  const meshes = PROP_MESHES.map((n) => model.getObjectByName(n)).filter(Boolean);
+  if (meshes.length !== PROP_MESHES.length) return console.warn('Propeller meshes not found');
+  const parent = meshes[0].parent.parent; // Collada_visual_scene_group, keeps the pivot in model space
+  const pivot = new THREE.Group();
+  pivot.name = 'propeller_pivot';
+  parent.add(pivot);
+  pivot.position.copy(parent.worldToLocal(new THREE.Vector3(...PROP_HUB)));
+  pivot.updateMatrixWorld();
+  meshes.forEach((m) => pivot.attach(m)); // attach keeps world transforms
+  prop.axis.set(...PROP_AXIS).transformDirection(parent.matrixWorld.clone().invert());
+  prop.pivot = pivot;
+}
+
+function updatePropeller(dt) {
+  if (!prop.pivot) return;
+  prop.holdLeft = Math.max(0, prop.holdLeft - dt); // same clock as the spin, so low fps can't cut the hold short
+  const boost = prop.pressed || prop.holdLeft > 0;
+  const target = boost ? PROP_BOOST_RPS : PROP_IDLE_RPS;
+  const tau = boost ? PROP_SPIN_UP : PROP_SPIN_DOWN;
+  prop.rps += (target - prop.rps) * (1 - Math.exp(-dt / tau));
+  prop.pivot.rotateOnAxis(prop.axis, prop.rps * Math.PI * 2 * dt);
+}
+
+// OrbitControls fires start/end for drag, touch and wheel. The UI can call these the same way later.
+function propBoostStart() { prop.pressed = true; }
+function propBoostEnd() { prop.pressed = false; prop.holdLeft = PROP_BOOST_HOLD; }
+controls.addEventListener('start', propBoostStart);
+controls.addEventListener('end', propBoostEnd);
 
 function applyAnisotropy(model) {
   const level = Math.min(ANISOTROPY, renderer.capabilities.getMaxAnisotropy());
@@ -107,7 +154,7 @@ function applyPaintTweaks(model) {
 }
 
 // Live tuning from devtools: __debug.lights.key.intensity = 3, __debug.materials.Body_mat.roughness = 0.4 …
-window.__debug = { scene, renderer, camera, lights, setEnvironment, get materials() {
+window.__debug = { scene, renderer, camera, controls, lights, prop, setEnvironment, get materials() {
   const out = {};
   scene.traverse((o) => { if (o.material) out[o.material.name] = o.material; });
   return out;
@@ -159,7 +206,11 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-renderer.setAnimationLoop(() => {
+let lastTime = null;
+renderer.setAnimationLoop((time) => {
+  const dt = lastTime === null ? 0 : Math.min((time - lastTime) / 1000, 0.1); // clamp: no jump after a hidden tab
+  lastTime = time;
+  updatePropeller(dt);
   controls.update();
   renderer.render(scene, camera);
 });
