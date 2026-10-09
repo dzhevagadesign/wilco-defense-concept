@@ -7,14 +7,16 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 const MODEL_URL = '/models/mq-9_reaper.glb';
 const BG_COLOR = 0x0e0f11;
 const EXPOSURE = 0.9;
-const ENV_INTENSITY = 0.45; // studio env is now fill only; form comes from KEY/RIM
+const ENV_INTENSITY = 0.7; // studio env is fill only; form comes from KEY/RIM. Raised from 0.45 to offset the tint
+const ENV_TINT = 0xb4cbf2; // multiplies the studio room: blue fill in shadows and blue in reflections
 const FOV = 35;
 const FIT_MARGIN = 1.15; // >1 leaves air around the bounding sphere
 const ANISOTROPY = 16; // capped by the GPU; sharpens textures on surfaces seen at grazing angles
 
 // Directional lights; position = direction the light comes from (nose +X, up +Y, wingspan Z).
-const KEY_LIGHT = { color: 0xfff4e8, intensity: 1.7, from: [3, 6, 5] }; // upper front-left, slightly warm
-const RIM_LIGHT = { color: 0xdde8ff, intensity: 1.4, from: [-6, 2, -5] }; // behind-right, cool edge
+// Blue grading matched to the client's hangar reference: lit tops ≈ sRGB 135/148/169, sides ≈ 103/113/126.
+const KEY_LIGHT = { color: 0xf2f5ff, intensity: 1.7, from: [3, 6, 5] }; // upper front-left, cool white
+const RIM_LIGHT = { color: 0xa8c4ff, intensity: 1.6, from: [-6, 2, -5] }; // behind-right, blue edge
 
 // Runtime multipliers on the painted grey (GLB stays untouched). They multiply the textures:
 // color × baseColor, roughness × ORM.G, metalness × ORM.B. Source paint is ~0.97 rough and ~0.47 metal.
@@ -38,10 +40,23 @@ document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(BG_COLOR);
 
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = ENV_INTENSITY;
-pmrem.dispose();
+setEnvironment(ENV_TINT);
+
+// Neutral studio room with every surface, light panel and light inside it multiplied by `tint`.
+function setEnvironment(tint) {
+  const room = new RoomEnvironment();
+  const c = new THREE.Color(tint);
+  room.traverse((o) => {
+    if (o.isLight) o.color.multiply(c);
+    if (o.material) o.material.color.multiply(c);
+  });
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment?.dispose();
+  scene.environment = pmrem.fromScene(room, 0.04).texture;
+  pmrem.dispose();
+  room.dispose();
+}
 
 const lights = {};
 for (const [name, cfg] of Object.entries({ key: KEY_LIGHT, rim: RIM_LIGHT })) {
@@ -92,7 +107,7 @@ function applyPaintTweaks(model) {
 }
 
 // Live tuning from devtools: __debug.lights.key.intensity = 3, __debug.materials.Body_mat.roughness = 0.4 …
-window.__debug = { scene, renderer, camera, lights, get materials() {
+window.__debug = { scene, renderer, camera, lights, setEnvironment, get materials() {
   const out = {};
   scene.traverse((o) => { if (o.material) out[o.material.name] = o.material; });
   return out;
