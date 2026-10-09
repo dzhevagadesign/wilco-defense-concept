@@ -11,19 +11,20 @@ const DESIGN_H = 1200;
 const DESIGN_FOV = 25;
 
 // Plane pose per step in camera space (camera at the origin looking down -Z).
-// pos = model centre; rot = rotation vector (axis × angle, rad). Steps 2–5 are fitted to the mockups;
-// step 1 has no plane in the mockup and was composed under the headline.
+// pos = model centre; rot = rotation vector (axis × angle, rad). All five are fitted to the mockups
+// (step 1 to the client's screenshot of the frame, since the Figma frame itself has no plane layer).
 const POSES = [
-  { pos: [0.2, -1.7, -22], rot: [-0.3048, 3.659, 0.5761] },
+  { pos: [-0.049, -0.976, -19.207], rot: [0.3997, -1.5236, -0.3895] },
   { pos: [2.309, -0.143, -14.84], rot: [-0.3048, 3.659, 0.5761] },
   { pos: [-3.179, -0.207, -14.595], rot: [0.2912, -0.4185, -0.1196] },
   { pos: [2.497, -0.032, -13.734], rot: [-0.2168, -2.335, 0.3774] },
   { pos: [0.012, 0.764, -14.209], rot: [-0.1774, 1.5564, -0.1801] },
 ];
 
-// Entry on the first screen: the plane comes in from above, close to the camera, and settles into its pose.
-const ENTRY_FROM = { pos: [1.5, 9, -7], tiltDeg: [-55, 0, 0] }; // tilt is applied on top of the first pose
-const ENTRY_DURATION = 2.8; // s
+// Entry on the first screen: the plane starts far away above the top edge, flies nose-first towards the
+// viewer while descending (growing in perspective), and levels out into the step-1 pose.
+const ENTRY_FROM = { pos: [0, 22, -85], tiltDeg: [-50, 0, 0] }; // tilt is applied on top of the first pose
+const ENTRY_DURATION = 3; // s
 
 const STEP_DURATION = 1.6; // s, camera move between steps
 const STEP_DIP = 1.8; // world units the plane drifts away mid-move, for depth
