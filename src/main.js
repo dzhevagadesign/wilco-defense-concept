@@ -10,6 +10,7 @@ const EXPOSURE = 0.9;
 const ENV_INTENSITY = 0.45; // studio env is now fill only; form comes from KEY/RIM
 const FOV = 35;
 const FIT_MARGIN = 1.15; // >1 leaves air around the bounding sphere
+const ANISOTROPY = 16; // capped by the GPU; sharpens textures on surfaces seen at grazing angles
 
 // Directional lights; position = direction the light comes from (nose +X, up +Y, wingspan Z).
 const KEY_LIGHT = { color: 0xfff4e8, intensity: 1.7, from: [3, 6, 5] }; // upper front-left, slightly warm
@@ -60,6 +61,7 @@ new GLTFLoader().load(MODEL_URL, (gltf) => {
   scene.add(model);
   model.updateMatrixWorld(true);
   applyPaintTweaks(model);
+  applyAnisotropy(model);
 
   const box = new THREE.Box3().setFromObject(model);
   fitCamera(model, box);
@@ -67,6 +69,14 @@ new GLTFLoader().load(MODEL_URL, (gltf) => {
   // Log after the first frame so renderer.info reflects real uploads/draws.
   requestAnimationFrame(() => report(gltf, box));
 }, undefined, (err) => console.error('GLB load failed:', err));
+
+function applyAnisotropy(model) {
+  const level = Math.min(ANISOTROPY, renderer.capabilities.getMaxAnisotropy());
+  model.traverse((o) => {
+    if (!o.material) return;
+    for (const v of Object.values(o.material)) if (v?.isTexture) v.anisotropy = level;
+  });
+}
 
 function applyPaintTweaks(model) {
   const done = new Set();
