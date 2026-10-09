@@ -172,3 +172,83 @@ body[data-step='4'] .cue__label--top { opacity: 1; transform: none; transition-d
 /* Debug overlay (?overlay): the mockup on top, for matching plane poses. */
 .overlay { position: fixed; inset: 0; z-index: 9; pointer-events: none; opacity: 0.45;
   background: center / calc(1920px * var(--s)) calc(1200px * var(--s)) no-repeat; }
+
+/* ---- Mobile (≤ 767px, or portrait up to 1024px). site.js switches --s to the 390×844 frame here, so values
+   below are px of that frame. Keep the query in sync with layout() in site.js. ---- */
+.burger, .mmenu { display: none; }
+
+@media (max-width: 767px), (orientation: portrait) and (max-width: 1024px) {
+  :root { --edge: calc(20px * var(--s)); }
+  html, body { overscroll-behavior: none; touch-action: none; }
+
+  .head { top: calc(18px * var(--s)); grid-template-columns: 1fr auto; z-index: 6; }
+  .head__menu, .head__cta { display: none; }
+  .head__brand { gap: calc(12px * var(--s)); }
+  .head__logo img { width: calc(92px * var(--s)); height: calc(35px * var(--s)); }
+  .head__divider { height: calc(20px * var(--s)); }
+  .drop--brand { font-size: calc(16px * var(--s)); gap: calc(8px * var(--s)); }
+  .drop--brand img { width: calc(11px * var(--s)); }
+
+  .burger {
+    display: grid; align-content: center; justify-items: end; gap: calc(7px * var(--s));
+    width: calc(44px * var(--s)); height: calc(44px * var(--s)); margin-right: calc(-8px * var(--s));
+  }
+  .burger span {
+    display: block; width: calc(24px * var(--s)); height: 2px; border-radius: 2px; background: #fff;
+    transition: transform 0.45s var(--ease-in-out);
+  }
+  .menu-open .burger span:first-child { transform: translateY(calc(4.5px * var(--s) + 1px)) rotate(45deg); }
+  .menu-open .burger span:last-child { transform: translateY(calc(-4.5px * var(--s) - 1px)) rotate(-45deg); }
+
+  .mmenu {
+    position: fixed; inset: 0; z-index: 5; display: flex; flex-direction: column; justify-content: space-between;
+    padding: calc(110px * var(--s)) var(--edge) calc(32px * var(--s)); background: var(--bg);
+    opacity: 0; visibility: hidden; transition: opacity 0.4s, visibility 0s linear 0.4s;
+  }
+  .menu-open .mmenu { opacity: 1; visibility: visible; transition: opacity 0.4s; }
+  .mmenu__list { list-style: none; margin: 0; padding: 0; }
+  .mmenu__list li {
+    border-bottom: 1px solid var(--ink-25);
+    opacity: 0; transform: translateY(calc(16px * var(--s)));
+    transition: opacity 0.4s, transform 0.6s var(--ease-out);
+  }
+  .menu-open .mmenu__list li { opacity: 1; transform: none; transition-delay: calc(0.08s + var(--i) * 0.05s); }
+  .mmenu__list a {
+    display: block; padding: calc(18px * var(--s)) 0;
+    font-family: var(--font-head); font-size: calc(30px * var(--s)); line-height: 1.2; letter-spacing: 0.02em;
+  }
+  .mmenu__cta { align-self: stretch; font-size: calc(18px * var(--s)); padding: calc(16px * var(--s)); border-radius: calc(40px * var(--s)); }
+
+  .lead {
+    top: calc(84px * var(--s)); width: calc(100% - 2 * var(--edge));
+    font-size: calc(14px * var(--s)); line-height: 1.45;
+  }
+
+  /* Text flows freely here (the desktop line breaks would leave orphans), so the per-line mask becomes
+     a staggered fade of the desktop lines plus a lift of the whole block. */
+  .slide, .slide--1, .slide--2, .slide--3, .slide--4, .slide--5 {
+    left: var(--edge); right: var(--edge); top: auto; bottom: calc(150px * var(--s));
+    white-space: normal; text-align: left; font-size: calc(30px * var(--s)); line-height: 1.2;
+    transform: translateY(calc(var(--dir, 1) * 28px * var(--s)));
+    transition: transform 0.9s var(--ease-out);
+  }
+  .slide.is-active { transform: none; transition-delay: 0.4s; }
+  .slide.is-leaving { transform: translateY(calc(var(--dir, 1) * -28px * var(--s))); transition: transform 0.6s var(--ease-in-out); }
+  .is-loading .slide.is-active { transform: translateY(calc(28px * var(--s))); }
+  .ln, .ln > span { display: inline; overflow: visible; padding: 0; margin: 0; }
+  .slide--1 { top: calc(100px * var(--s)); bottom: auto; text-align: center; font-size: calc(40px * var(--s)); line-height: 1.08; }
+  .slide--5 { text-align: center; }
+
+  .cue { gap: calc(14px * var(--s)); bottom: calc(24px * var(--s)); }
+  .cue__circle { width: calc(64px * var(--s)); height: calc(64px * var(--s)); }
+  .cue__arrow svg { width: calc(15px * var(--s)); height: calc(20px * var(--s)); }
+  .cue__labels { font-size: calc(14px * var(--s)); }
+
+  .progress { width: calc(120px * var(--s)); gap: calc(10px * var(--s)); bottom: calc(24px * var(--s)); }
+  .progress__bars { gap: calc(4px * var(--s)); }
+  .progress__count { font-size: calc(11px * var(--s)); }
+
+  .loader__logo { width: calc(110px * var(--s)); height: calc(42px * var(--s)); }
+  .loader__bar { width: calc(180px * var(--s)); }
+  .loader__pct { font-size: calc(12px * var(--s)); }
+}

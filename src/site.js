@@ -1,5 +1,6 @@
-// Wilco Defense — desktop concept: five full-screen steps, the MQ-9 changes pose on each step,
-// leans towards the cursor, and its propeller spins up while the scene changes.
+// Wilco Defense concept: five full-screen steps, the MQ-9 changes pose on each step, leans towards the
+// cursor, and its propeller spins up while the scene changes. Desktop layout from Figma; mobile (≤ 767px)
+// is a portrait adaptation with its own plane poses.
 import * as THREE from 'three';
 import { createStage } from './scene.js';
 
@@ -25,6 +26,26 @@ const POSES = [
 // viewer while descending (growing in perspective), and levels out into the step-1 pose.
 const ENTRY_FROM = { pos: [0, 22, -85], tiltDeg: [-50, 0, 0] }; // tilt is applied on top of the first pose
 const ENTRY_DURATION = 3; // s
+
+// Mobile: the UI is drawn in a 390×844 frame scaled to fit the screen (--s), and the camera keeps a fixed
+// horizontal FOV across that frame, so the plane fits the width on any phone and stays in scale on tablets. Poses give the screen position of the model centre
+// (ndc, -1..1, +y up) and its distance; rotations are the desktop ones, so both layouts tell the same story.
+const MOBILE_MAX = 767; // px; portrait screens up to TABLET_MAX also get the mobile layout (same as site.css)
+const TABLET_MAX = 1024;
+const MOBILE_FRAME_W = 390;
+const MOBILE_FRAME_H = 844;
+const MOBILE_HFOV = 32; // deg
+const POSES_MOBILE = [
+  { ndc: [0, 0.02], dist: 15, rot: POSES[0].rot },
+  { ndc: [0.04, 0.17], dist: 13, rot: POSES[1].rot },
+  { ndc: [0.06, 0.17], dist: 12, rot: POSES[2].rot },
+  { ndc: [0.04, 0.17], dist: 12.5, rot: POSES[3].rot },
+  { ndc: [0, 0.3], dist: 12, rot: POSES[4].rot },
+];
+const ENTRY_FROM_MOBILE = { ndc: [0, 1.35], dist: 85, tiltDeg: [-50, 0, 0] };
+
+// Swipe (finger, or mouse drag in the mobile layout): a vertical drag longer than this changes the step.
+const SWIPE_MIN = 40; // px
 
 const STEP_DURATION = 1.6; // s, camera move between steps
 const STEP_DIP = 1.8; // world units the plane drifts away mid-move, for depth
@@ -54,30 +75,56 @@ const camera = new THREE.PerspectiveCamera(DESIGN_FOV, 1, 0.1, 400);
 const rig = new THREE.Group();
 scene.add(rig);
 
-const toPose = ({ pos, rot }) => {
-  const v = new THREE.Vector3(...rot);
+// Desktop poses are camera-space positions; mobile ones are screen positions, resolved with the current FOV.
+function toPosition({ pos, ndc, dist }) {
+  if (pos) return new THREE.Vector3(...pos);
+  const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  return new THREE.Vector3(ndc[0] * dist * tanV * camera.aspect, ndc[1] * dist * tanV, -dist);
+}
+const toPose = (p) => {
+  const v = new THREE.Vector3(...p.rot);
   const angle = v.length();
-  return { pos: new THREE.Vector3(...pos), quat: new THREE.Quaternion().setFromAxisAngle(v.normalize(), angle) };
+  return { pos: toPosition(p), quat: new THREE.Quaternion().setFromAxisAngle(v.normalize(), angle) };
 };
-const poses = POSES.map(toPose);
-const entryPose = {
-  pos: new THREE.Vector3(...ENTRY_FROM.pos),
+const toEntry = (cfg, first) => ({
+  pos: toPosition(cfg),
   quat: new THREE.Quaternion()
-    .setFromEuler(new THREE.Euler(...ENTRY_FROM.tiltDeg.map(THREE.MathUtils.degToRad)))
-    .multiply(poses[0].quat),
-};
+    .setFromEuler(new THREE.Euler(...cfg.tiltDeg.map(THREE.MathUtils.degToRad)))
+    .multiply(first.quat),
+});
+
+let poses = [];
+let entryPose = null;
+let base = null; // current pose before the cursor tilt; created after the first layout
+let parked = true; // plane waits at the entry pose until the preloader leaves
+let mobileLayout = false;
 
 function layout() {
   const w = window.innerWidth;
   const h = window.innerHeight;
-  const s = Math.min(w / DESIGN_W, h / DESIGN_H);
+  const mobile = w <= MOBILE_MAX || (h >= w && w <= TABLET_MAX);
+  const s = mobile ? Math.min(w / MOBILE_FRAME_W, h / MOBILE_FRAME_H) : Math.min(w / DESIGN_W, h / DESIGN_H);
   root.style.setProperty('--s', s);
   renderer.setSize(w, h);
-  // Keep the design frame (1920×1200 × s, centred) at the design FOV; the rest of the window is extra view.
-  const tanHalf = Math.tan(THREE.MathUtils.degToRad(DESIGN_FOV / 2)) * (h / (DESIGN_H * s));
-  camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(tanHalf));
   camera.aspect = w / h;
+  if (mobile) {
+    const tanH = Math.tan(THREE.MathUtils.degToRad(MOBILE_HFOV / 2)) * (w / (MOBILE_FRAME_W * s));
+    camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(tanH / camera.aspect));
+  } else {
+    // Keep the design frame (1920×1200 × s, centred) at the design FOV; the rest of the window is extra view.
+    const tanHalf = Math.tan(THREE.MathUtils.degToRad(DESIGN_FOV / 2)) * (h / (DESIGN_H * s));
+    camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(tanHalf));
+  }
   camera.updateProjectionMatrix();
+  mobileLayout = mobile;
+
+  poses = (mobile ? POSES_MOBILE : POSES).map(toPose);
+  entryPose = toEntry(mobile ? ENTRY_FROM_MOBILE : ENTRY_FROM, poses[0]);
+  if (!base) return;
+  // Re-aim at the poses of the new layout (rotating a phone, resizing across the breakpoint).
+  if (parked) { base.pos.copy(entryPose.pos); base.quat.copy(entryPose.quat); }
+  else if (move.t < 1) move.to = poses[current];
+  else { base.pos.copy(poses[current].pos); base.quat.copy(poses[current].quat); }
 }
 layout();
 window.addEventListener('resize', layout);
@@ -86,7 +133,7 @@ window.addEventListener('resize', layout);
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 
-const base = { pos: entryPose.pos.clone(), quat: entryPose.quat.clone() };
+base = { pos: entryPose.pos.clone(), quat: entryPose.quat.clone() };
 const move = { from: null, to: null, t: 1, duration: 1, ease: easeInOutCubic, dip: 0 };
 
 function flyTo(pose, duration, ease, dip = 0) {
@@ -114,6 +161,10 @@ window.addEventListener('pointermove', (e) => {
   pointer.y = (e.clientY / window.innerHeight) * 2 - 1;
 });
 document.addEventListener('pointerleave', () => { pointer.x = 0; pointer.y = 0; });
+// A finger has no hover: let the plane settle back once it lifts.
+const releaseTouch = (e) => { if (e.pointerType === 'touch') { pointer.x = 0; pointer.y = 0; } };
+window.addEventListener('pointerup', releaseTouch);
+window.addEventListener('pointercancel', releaseTouch);
 
 const hoverQuat = new THREE.Quaternion();
 const hoverEuler = new THREE.Euler();
@@ -199,7 +250,7 @@ window.addEventListener('wheel', (e) => {
   const now = performance.now();
   const quiet = now - lastWheel > WHEEL_QUIET_MS;
   lastWheel = now;
-  if (busy || !uiReady) { needQuiet = true; wheelAcc = 0; return; }
+  if (busy || !uiReady || menuOpen()) { needQuiet = true; wheelAcc = 0; return; }
   if (needQuiet && !quiet) return; // inertia tail of the gesture that started the last move
   needQuiet = false;
   if (quiet) wheelAcc = 0;
@@ -211,12 +262,37 @@ window.addEventListener('wheel', (e) => {
 }, { passive: false });
 
 window.addEventListener('keydown', (e) => {
-  if (busy || !uiReady) return;
+  if (e.key === 'Escape') setMenu(false);
+  if (busy || !uiReady || menuOpen()) return;
   if (['ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); next(); }
   if (['ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); prev(); }
   if (e.key === 'Home') goTo(0);
   if (e.key === 'End') goTo(STEPS - 1);
 });
+
+// Pointer events cover real touch and the mouse in a desktop browser's responsive mode.
+let dragY = null;
+window.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'touch' || mobileLayout) dragY = e.clientY;
+});
+window.addEventListener('pointerup', (e) => {
+  if (dragY === null) return;
+  const dy = dragY - e.clientY;
+  dragY = null;
+  if (busy || !uiReady || menuOpen() || Math.abs(dy) < SWIPE_MIN) return;
+  dy > 0 ? next() : prev();
+});
+window.addEventListener('pointercancel', () => { dragY = null; });
+
+const burger = document.querySelector('.burger');
+const menuOpen = () => root.classList.contains('menu-open');
+function setMenu(open) {
+  root.classList.toggle('menu-open', open);
+  burger.setAttribute('aria-expanded', String(open));
+}
+burger.addEventListener('click', () => setMenu(!menuOpen()));
+document.querySelectorAll('.mmenu a').forEach((a) => a.addEventListener('click', () => setMenu(false)));
+window.addEventListener('resize', () => { if (!mobileLayout) setMenu(false); });
 
 document.querySelector('.cue').addEventListener('click', () => {
   if (busy) return;
@@ -225,7 +301,7 @@ document.querySelector('.cue').addEventListener('click', () => {
 
 // ---- Intro ----
 const startStep = Math.min(Math.max(parseInt(params.get('step'), 10) - 1 || 0, 0), STEPS - 1);
-if (startStep) goTo(startStep, { instant: true });
+if (startStep) { parked = false; goTo(startStep, { instant: true }); }
 renderStepUI(current);
 
 // Preloader: download is 0–85 %, parsing 85–90 %, GPU warm-up 90–100 %. The page intro and the
@@ -264,7 +340,8 @@ const modelLoad = stage.loadModel((e) => {
 }).then(async ({ model }) => {
   setLoad(0.9);
   rig.add(model);
-  if (!startStep) {
+  if (startStep) parked = false;
+  else {
     base.pos.copy(entryPose.pos); // parked above the frame for the entry flight
     base.quat.copy(entryPose.quat);
   }
@@ -290,6 +367,7 @@ Promise.all([fontsReady, modelLoad]).then(async ([, ok]) => {
   setTimeout(() => loader.el.remove(), 1200);
   await new Promise((r) => setTimeout(r, 350)); // content has lifted off; start the page under the fade
   root.classList.remove('is-loading');
+  parked = false;
   if (ok && !startStep) { // deep link (?step=N) shows the pose straight away
     flyTo(poses[current], ENTRY_DURATION, easeOutCubic);
     stage.boostStart();
@@ -315,4 +393,4 @@ renderer.setAnimationLoop((time) => {
 });
 
 // Tuning from devtools: __site.poses[1].pos.x = 2.5, __site.goTo(2) …
-window.__site = { stage, camera, rig, poses, base, goTo, get step() { return current; } };
+window.__site = { stage, camera, rig, base, goTo, get poses() { return poses; }, get step() { return current; } };

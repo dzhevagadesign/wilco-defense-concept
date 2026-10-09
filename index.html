@@ -43,7 +43,21 @@
       <div class="head__cta intro" style="--d: 5">
         <a class="btn" href="#">Book a demo</a>
       </div>
+      <button class="burger intro" style="--d: 1" type="button" aria-label="Menu" aria-expanded="false" aria-controls="mmenu">
+        <span></span><span></span>
+      </button>
     </header>
+
+    <!-- Mobile menu: the desktop nav and CTA, full screen behind the burger. -->
+    <nav class="mmenu" id="mmenu" aria-label="Main">
+      <ul class="mmenu__list">
+        <li style="--i: 0"><a href="#">Products</a></li>
+        <li style="--i: 1"><a href="#">Company</a></li>
+        <li style="--i: 2"><a href="#">Resources</a></li>
+        <li style="--i: 3"><a href="#">Contact us</a></li>
+      </ul>
+      <a class="btn mmenu__cta" href="#">Book a demo</a>
+    </nav>
 
     <main class="slides">
       <p class="lead" aria-hidden="false">
