@@ -144,7 +144,26 @@ body[data-step='4'] .cue__label--top { opacity: 1; transform: none; transition-d
 }
 .progress__bars span.is-on { height: 4px; background: #fff; }
 
-/* ---- Intro: UI slides in once fonts are ready (html loses .is-loading) ---- */
+/* ---- Preloader: model download + GPU warm-up; the page intro starts as it leaves ---- */
+.loader {
+  position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: var(--bg);
+  transition: opacity 0.8s var(--ease-in-out) 0.25s, visibility 0s linear 1.05s;
+}
+.loader__inner {
+  display: flex; flex-direction: column; align-items: center; gap: calc(28px * var(--s));
+  animation: loader-in 0.7s var(--ease-out) backwards; /* not `both`: a held animation would block the exit transition */
+  transition: opacity 0.45s, transform 0.6s var(--ease-in-out);
+}
+.loader__logo { width: calc(121.37px * var(--s)); height: calc(46px * var(--s)); }
+.loader__bar { width: calc(258px * var(--s)); height: 2px; border-radius: 2px; background: var(--ink-35); overflow: hidden; }
+.loader__fill { display: block; height: 100%; background: #fff; transform: scaleX(0); transform-origin: left; }
+.loader__pct { font-weight: 300; font-size: calc(12px * var(--s)); line-height: 1.4; font-variant-numeric: tabular-nums; }
+.loader__unit { color: var(--ink-35); margin-left: 1px; }
+.loader.is-done { opacity: 0; visibility: hidden; pointer-events: none; }
+.loader.is-done .loader__inner { opacity: 0; transform: translateY(calc(-16px * var(--s))); }
+@keyframes loader-in { from { opacity: 0; transform: translateY(calc(10px * var(--s))); } }
+
+/* ---- Intro: UI slides in as the preloader leaves (html loses .is-loading) ---- */
 .intro { transition: opacity 0.9s var(--ease-out), transform 0.9s var(--ease-out); transition-delay: calc(0.1s + var(--d) * 0.07s); }
 .is-loading .intro { opacity: 0; transform: translateY(calc(-14px * var(--s))); }
 .is-loading .intro--up { transform: translateY(calc(18px * var(--s))); }

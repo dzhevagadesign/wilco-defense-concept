@@ -228,9 +228,73 @@ const startStep = Math.min(Math.max(parseInt(params.get('step'), 10) - 1 || 0, 0
 if (startStep) goTo(startStep, { instant: true });
 renderStepUI(current);
 
+// Preloader: download is 0–85 %, parsing 85–90 %, GPU warm-up 90–100 %. The page intro and the
+// entry flight start together as it leaves, so nothing is revealed half-ready.
+const MODEL_BYTES = 28476756; // fallback when the server hides Content-Length (e.g. gzip on Pages)
+const LOADER_SMOOTH = 0.25; // s, how fast the shown percentage chases the real one
+const loader = {
+  el: document.querySelector('.loader'),
+  fill: document.querySelector('.loader__fill'),
+  num: document.querySelector('.loader__num'),
+  target: 0,
+  shown: 0,
+  onFull: null,
+};
+const setLoad = (v) => { loader.target = Math.max(loader.target, Math.min(v, 1)); };
+
+function updateLoader(dt) {
+  if (!loader.el) return;
+  loader.shown += (loader.target - loader.shown) * (1 - Math.exp(-dt / LOADER_SMOOTH));
+  if (loader.target === 1 && loader.shown > 0.995) loader.shown = 1;
+  const pct = Math.round(loader.shown * 100);
+  loader.fill.style.transform = `scaleX(${loader.shown})`;
+  loader.num.textContent = pct;
+  loader.el.setAttribute('aria-valuenow', pct);
+  if (loader.shown === 1 && loader.onFull) { loader.onFull(); loader.onFull = null; }
+}
+const loaderFull = new Promise((r) => { loader.onFull = r; });
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+
 const fontsReady = Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 2500))]);
-fontsReady.then(() => {
+
+rig.visible = false;
+const modelLoad = stage.loadModel((e) => {
+  const total = e.lengthComputable && e.total >= e.loaded ? e.total : Math.max(MODEL_BYTES, e.loaded);
+  setLoad(0.85 * (e.loaded / total));
+}).then(async ({ model }) => {
+  setLoad(0.9);
+  rig.add(model);
+  if (!startStep) {
+    base.pos.copy(entryPose.pos); // parked above the frame for the entry flight
+    base.quat.copy(entryPose.quat);
+  }
+  rig.visible = true;
+  await nextFrame(); // let the bar paint 90 % before the blocking upload
+  // Upload the textures (~590 MB with mips) and compile shaders now; otherwise that multi-second
+  // stall lands on the first frames of the entry flight.
+  model.traverse((o) => {
+    if (o.material) for (const v of Object.values(o.material)) if (v?.isTexture) renderer.initTexture(v);
+  });
+  await renderer.compileAsync(scene, camera);
+  modelReady = true;
+  return true;
+}).catch((err) => {
+  console.error('GLB load failed:', err);
+  return false; // reveal the page anyway
+});
+
+Promise.all([fontsReady, modelLoad]).then(async ([, ok]) => {
+  setLoad(1);
+  await loaderFull;
+  loader.el.classList.add('is-done');
+  setTimeout(() => loader.el.remove(), 1200);
+  await new Promise((r) => setTimeout(r, 350)); // content has lifted off; start the page under the fade
   root.classList.remove('is-loading');
+  if (ok && !startStep) { // deep link (?step=N) shows the pose straight away
+    flyTo(poses[current], ENTRY_DURATION, easeOutCubic);
+    stage.boostStart();
+    setTimeout(stage.boostEnd, ENTRY_DURATION * 700);
+  }
   setTimeout(() => {
     uiReady = true;
     // Stagger delays are for the intro only; hover states must react immediately.
@@ -238,32 +302,12 @@ fontsReady.then(() => {
   }, 1600);
 });
 
-rig.visible = false;
-stage.loadModel().then(async ({ model }) => {
-  rig.add(model);
-  if (!startStep) {
-    base.pos.copy(entryPose.pos); // parked above the frame while the GPU warms up
-    base.quat.copy(entryPose.quat);
-  }
-  rig.visible = true;
-  // Upload the textures (~590 MB with mips) and compile shaders before the first frame needs them;
-  // otherwise that multi-second stall swallows the start of the entry flight.
-  model.traverse((o) => {
-    if (o.material) for (const v of Object.values(o.material)) if (v?.isTexture) renderer.initTexture(v);
-  });
-  await renderer.compileAsync(scene, camera);
-  modelReady = true;
-  if (startStep) return; // deep link (?step=N) shows the pose straight away
-  flyTo(poses[current], ENTRY_DURATION, easeOutCubic);
-  stage.boostStart();
-  setTimeout(stage.boostEnd, ENTRY_DURATION * 700);
-}).catch((err) => console.error('GLB load failed:', err));
-
 // ---- Loop ----
 let lastTime = null;
 renderer.setAnimationLoop((time) => {
   const dt = lastTime === null ? 0 : Math.min((time - lastTime) / 1000, 0.1); // clamp: no jump after a hidden tab
   lastTime = time;
+  updateLoader(dt);
   updateMove(dt);
   updateRig(dt);
   stage.update(dt);
