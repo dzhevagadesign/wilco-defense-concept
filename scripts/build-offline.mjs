@@ -23,18 +23,7 @@ const glb = readFileSync(resolve(root, 'public/models/mq-9_reaper.glb'));
 writeFileSync(resolve(out, 'model.js'), `window.__WILCO_MODEL_B64="${glb.toString('base64')}";\n`);
 rmSync(resolve(out, 'models/mq-9_reaper.glb')); // the copy from public/ is unused offline; keep the licence
 
-writeFileSync(
-  resolve(out, 'README.txt'),
-  `Wilco Defense — offline concept
-
-Open index.html in Chrome, Edge, Firefox or Safari (double-click). No internet or server needed.
-Keep all files together: index.html, model.js and the assets/, fonts/, ui/, design/, models/ folders.
-
-Scroll, arrow keys or swipe move between the five screens.
-?step=3 after index.html opens a screen directly; ?overlay lays the Figma mockup over the page.
-
-3D model: "MQ-9 Reaper" by Tyler V Howell (https://sketchfab.com/TVHowell), CC-BY-4.0 —
-https://sketchfab.com/3d-models/mq-9-reaper-eff549610fee4f20904f7b388a3a0830
-`,
-);
+// Bilingual handover notes; the BOM keeps Cyrillic readable in older Notepad versions.
+const readme = readFileSync(resolve(import.meta.dirname, 'offline-readme.txt'), 'utf8');
+writeFileSync(resolve(out, 'README.txt'), '\uFEFF' + readme.replace(/\r?\n/g, '\r\n'));
 console.log('dist-offline ready');
