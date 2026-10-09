@@ -13,6 +13,15 @@ npx vite --port 5370
 - `/` — the site. `?step=3` opens a screen directly, `?overlay` lays the Figma mockup over the page.
 - `/viewer.html` — orbit viewer with the same lighting and console diagnostics of the model.
 
+Offline copy that opens by double-clicking `index.html` (no server, no internet):
+
+```bash
+npm run build:offline
+```
+
+It writes `dist-offline/`: one classic script instead of ES modules, the model as `model.js` (base64), fonts
+self-hosted. Zip that folder to hand it over.
+
 Tunables live at the top of `src/site.js` (poses, timings, cursor response) and `src/scene.js` (lighting,
 paint grade, propeller).
 

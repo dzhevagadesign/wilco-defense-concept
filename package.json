@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:offline": "node scripts/build-offline.mjs"
   },
   "dependencies": {
     "three": "^0.186.1",

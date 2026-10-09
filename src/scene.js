@@ -37,6 +37,26 @@ const PROP_SPIN_UP = 0.6; // s, time constant towards boost
 const PROP_SPIN_DOWN = 1.4; // s, time constant back to idle
 const PROP_BOOST_HOLD = 0.8; // s the boost lingers after boostEnd (a wheel tick starts and ends at once)
 
+// The offline build (`npm run build:offline`) is opened straight from disk, where fetch() can't read files.
+// There the GLB ships as model.js, a classic script that sets window.__WILCO_MODEL_B64, parsed from memory.
+function loadGltf(onProgress) {
+  if (import.meta.env.MODE !== 'offline') return new GLTFLoader().loadAsync(MODEL_URL, onProgress);
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'model.js';
+    script.onload = () => {
+      const bin = atob(window.__WILCO_MODEL_B64);
+      window.__WILCO_MODEL_B64 = null; // drop the 38 MB string once decoded
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      onProgress?.({ loaded: bytes.length, total: bytes.length, lengthComputable: true });
+      new GLTFLoader().parse(bytes.buffer, '', resolve, reject);
+    };
+    script.onerror = () => reject(new Error('model.js not found next to index.html'));
+    document.head.appendChild(script);
+  });
+}
+
 export function createStage({ canvas, transparent = false, background = 0x0e0f11 } = {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: transparent });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -127,7 +147,7 @@ export function createStage({ canvas, transparent = false, background = 0x0e0f11
 
   // Resolves with the prepared model, not yet added to the scene.
   function loadModel(onProgress) {
-    return new GLTFLoader().loadAsync(MODEL_URL, onProgress).then((gltf) => {
+    return loadGltf(onProgress).then((gltf) => {
       const model = gltf.scene;
       model.updateMatrixWorld(true);
       applyPaintTweaks(model);

@@ -3,3 +3,5 @@ dist/
 # source downloads and screen recordings stay on disk, out of git
 download/
 video/
+dist-offline/
+*.zip
