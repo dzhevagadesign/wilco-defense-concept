@@ -3,6 +3,7 @@
 // is a portrait adaptation with its own plane poses.
 import * as THREE from 'three';
 import { createStage } from './scene.js';
+import { arrow, underline, group, ARROWS } from './doodles.js';
 
 // ---- Tunables ----
 // Camera matches the mockups: fitting model keypoints to the five Figma frames gave the lowest error
@@ -204,6 +205,95 @@ function renderStepUI(i) {
   if (overlay) overlay.style.backgroundImage = `url(${import.meta.env.BASE_URL}design/step${i + 1}.png)`;
 }
 
+// ---- Brand doodles ----
+// Screens 1 and 5 underline the .mark phrase; screens 2–4 draw an arrow from the text to a point on the plane,
+// each in a different hand. Desktop arrows leave the text sideways; on mobile they rise from the top of the
+// text block. Built from live text rects and the projected target pose, so they fit any window size.
+const PLANE_POINTS = { nose: [2.816, -0.083, 0], turret: [1.496, -0.365, 0] }; // model space
+const DOODLES = [
+  { underline: 'single' },
+  { arrow: 'wave', target: 'nose', from: 'lastLineEnd', mobileX: 0.3, flip: true }, // bulge below, away from the text
+  { arrow: 'sweep', target: 'nose', from: 'firstLineStart', mobileX: 0.62 },
+  { arrow: 'loop', target: 'turret', from: 'lastLineEnd', mobileX: 0.4 },
+  { underline: 'double' },
+];
+const DOODLE_TEXT_DELAY = 1.4; // s after a screen's text starts revealing, when its rects are final
+
+const doodleLayer = document.querySelector('.doodles');
+let doodleGroup = null;
+let doodleTimer = 0;
+let revealed = false; // text is laid out for real (preloader gone)
+
+function projectOnPlane(step, name) {
+  const p = poses[step];
+  const v = new THREE.Vector3(...PLANE_POINTS[name]).applyQuaternion(p.quat).add(p.pos).project(camera);
+  return [((v.x + 1) / 2) * window.innerWidth, ((1 - v.y) / 2) * window.innerHeight];
+}
+
+function clearDoodles() {
+  clearTimeout(doodleTimer);
+  if (!doodleGroup) return;
+  const old = doodleGroup;
+  doodleGroup = null;
+  old.classList.add('is-gone');
+  setTimeout(() => old.remove(), 400);
+}
+
+function drawDoodles(step, { animate = true } = {}) {
+  clearDoodles();
+  const cfg = DOODLES[step];
+  const slide = slides[step];
+  const s = parseFloat(root.style.getPropertyValue('--s')) || 1;
+  const g = group('screen');
+
+  if (cfg.underline) {
+    const mark = slide.querySelector('.mark');
+    const r = mark.getClientRects()[0];
+    const fs = parseFloat(getComputedStyle(mark).fontSize);
+    const w = Math.max(fs * 0.085, 3.2);
+    const y = r.bottom - r.height * 0.14;
+    g.append(underline(r.left - fs * 0.04, r.right + fs * 0.03, y, { width: w, seed: step + 3, rise: fs * 0.04 }));
+    if (cfg.underline === 'double') {
+      g.append(underline(r.left + r.width * 0.07, r.right - r.width * 0.14, y + w * 2.7, {
+        width: w * 0.85, seed: step + 11, delay: 0.3, rise: -fs * 0.02,
+      }));
+    }
+  } else {
+    const lines = [...slide.querySelectorAll('.ln > span')];
+    let start;
+    if (mobileLayout) {
+      const r = slide.getBoundingClientRect();
+      start = [r.left + r.width * cfg.mobileX, r.top - 16 * s];
+    } else if (cfg.from === 'lastLineEnd') {
+      const r = lines[lines.length - 1].getBoundingClientRect();
+      start = [r.right + 30 * s, r.top + r.height * 0.58];
+    } else {
+      const r = lines[0].getBoundingClientRect();
+      start = [r.left - 30 * s, r.top + r.height * 0.62];
+    }
+    const target = projectOnPlane(step, cfg.target);
+    const dx = target[0] - start[0], dy = target[1] - start[1], len = Math.hypot(dx, dy);
+    const gap = (mobileLayout ? 18 : 40) * s; // stop short of the plane
+    const end = [target[0] - (dx / len) * gap, target[1] - (dy / len) * gap];
+    g.append(arrow(ARROWS[cfg.arrow], start, end, {
+      width: (mobileLayout ? 4 : 7) * s, head: (mobileLayout ? 15 : 26) * s, seed: step * 13, flip: !!cfg.flip,
+    }));
+  }
+
+  doodleLayer.append(g);
+  doodleGroup = g;
+  if (!animate) { g.classList.add('no-anim', 'is-drawn'); return; }
+  requestAnimationFrame(() => requestAnimationFrame(() => g.classList.add('is-drawn')));
+}
+
+function scheduleDoodles(step, delaySec) {
+  clearTimeout(doodleTimer);
+  doodleTimer = setTimeout(() => drawDoodles(step), delaySec * 1000);
+}
+
+// Rebuild in place on resize (rects and the projection change); no redraw animation.
+window.addEventListener('resize', () => { if (doodleGroup) drawDoodles(current, { animate: false }); });
+
 function goTo(i, { instant = false } = {}) {
   if (i === current || i < 0 || i >= STEPS) return;
   const dir = i > current ? 1 : -1;
@@ -225,6 +315,9 @@ function goTo(i, { instant = false } = {}) {
 
   current = i;
   renderStepUI(i);
+  clearDoodles();
+  // Arrows point at the plane, so they are drawn once it has arrived.
+  if (revealed) scheduleDoodles(i, instant ? DOODLE_TEXT_DELAY : Math.max(STEP_DURATION, DOODLE_TEXT_DELAY));
 
   if (instant) {
     base.pos.copy(poses[i].pos);
@@ -367,6 +460,8 @@ Promise.all([fontsReady, modelLoad]).then(async ([, ok]) => {
   setTimeout(() => loader.el.remove(), 1200);
   await new Promise((r) => setTimeout(r, 350)); // content has lifted off; start the page under the fade
   root.classList.remove('is-loading');
+  revealed = true;
+  scheduleDoodles(current, DOODLE_TEXT_DELAY + 0.2);
   parked = false;
   if (ok && !startStep) { // deep link (?step=N) shows the pose straight away
     flyTo(poses[current], ENTRY_DURATION, easeOutCubic);

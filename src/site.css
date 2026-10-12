@@ -75,6 +75,14 @@ p, h1, h2 { margin: 0; font-weight: 400; }
 }
 .btn:hover { background: #dfe5ff; }
 
+/* ---- Brand doodles (src/doodles.js): above the plane, under the text ---- */
+.doodles { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; overflow: visible; }
+.doodles g.screen { transition: opacity 0.35s; }
+.doodles g.screen.is-gone { opacity: 0; }
+.doodle-reveal { stroke-dasharray: var(--dash) var(--gap); stroke-dashoffset: var(--gap); transition-property: stroke-dashoffset; transition-timing-function: cubic-bezier(0.55, 0, 0.35, 1); }
+.doodles g.is-drawn .doodle-reveal { stroke-dashoffset: 0; }
+.doodles g.no-anim .doodle-reveal { transition: none; }
+
 /* ---- Slides ---- */
 .slides { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
 
