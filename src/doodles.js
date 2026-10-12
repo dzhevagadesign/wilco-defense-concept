@@ -108,9 +108,22 @@ export const ARROWS = {
 
 // Arrow from `start` to `end` (screen px) in the given template; returns the group.
 // `flip` mirrors the template across the start→end line (which side the wave or loop bulges to).
-export function arrow(template, start, end, { width, head, seed = 7, delay = 0, flip = false }) {
+// `approach` (deg, screen: 0 = right, -90 = up) fixes the direction of travel at the tip: the last stretch is
+// re-aimed through a lead-in point, so the line and its head arrive at the target from that side.
+export function arrow(template, start, end, { width, head, seed = 7, delay = 0, flip = false, approach = null }) {
   const g = el('g', {});
-  const line = smooth(place(flip ? template.map(([x, y]) => [x, -y]) : template, start, end));
+  const pts = place(flip ? template.map(([x, y]) => [x, -y]) : template, start, end);
+  if (approach !== null) {
+    const len = Math.hypot(end[0] - start[0], end[1] - start[1]);
+    const a = (approach * Math.PI) / 180;
+    const lead = len * 0.18;
+    // Drop template points that sit closer to the tip than the lead-in, or the line would zigzag back.
+    while (pts.length > 2 && Math.hypot(pts[pts.length - 2][0] - end[0], pts[pts.length - 2][1] - end[1]) < lead * 1.15) {
+      pts.splice(-2, 1);
+    }
+    pts.splice(-1, 1, [end[0] - Math.cos(a) * lead, end[1] - Math.sin(a) * lead], end);
+  }
+  const line = smooth(pts);
   const t = stroke(g, line, width, { seed, taper: [0.1, 0.04] }, { delay, duration: 0.6 });
   // Open arrowhead: two short strokes meeting at the tip, angled off the last stretch of the line.
   const tip = line[line.length - 1];

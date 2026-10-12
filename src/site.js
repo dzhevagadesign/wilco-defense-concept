@@ -59,8 +59,12 @@ const HOVER_TAU = 0.45; // s, smoothing
 
 // Wheel: one step per gesture. Trackpads keep sending inertia events after the move ends,
 // so a new step needs a pause in the wheel stream first.
-const WHEEL_THRESHOLD = 30; // accumulated deltaY px
-const WHEEL_QUIET_MS = 220;
+const WHEEL_THRESHOLD = 20; // accumulated deltaY px that counts as an intent to move
+const WHEEL_NEW_GESTURE_MS = 180; // a pause this long always starts a new gesture
+// Input is accepted again this soon after a step; the plane's move (STEP_DURATION) is simply re-aimed if the
+// next step comes before it lands. The old rule (locked for the whole move, then wait for a pause in the wheel
+// stream) made continuous scrolling feel stuck.
+const STEP_LOCK = 0.8; // s
 
 const STEPS = POSES.length;
 
@@ -194,8 +198,9 @@ if (overlay) overlay.className = 'overlay';
 
 let current = 0;
 let uiReady = false; // wheel/keys wait for the UI intro
-let busy = false;
-let busyTimer = 0;
+let boostTimer = 0; // propeller boost lasts while the plane flies to the step
+let lockedUntil = 0; // navigation input ignored until then
+const locked = () => performance.now() < lockedUntil;
 let modelReady = false;
 
 function renderStepUI(i) {
@@ -212,20 +217,22 @@ function renderStepUI(i) {
 const PLANE_POINTS = { nose: [2.816, -0.083, 0], turret: [1.496, -0.365, 0], wingStbd: [-0.246, -0.071, 6.476] }; // model space
 // Desktop arrows follow the client's sketches: `from` is relative to the last text line (left + ax × width + dx,
 // bottom + dy), `to` is an offset from the projected plane point — both in mockup px (× --s).
-// Mobile arrows rise from the top of the text block (x = fraction of its width) to the plane point.
+// Mobile arrows rise from the top of the text block (x = fraction of its width); `to` offsets the plane point and
+// `approach` sets the direction they arrive in (deg, 0 = right, -90 = up), so the head points at the plane.
 const DOODLES = [
   { underline: 'single' },
   {
     arrow: 'dip', target: 'nose', from: { ax: 0.9, dy: 33 }, to: [-95, 47],
-    mobile: { arrow: 'wave', target: 'nose', x: 0.3, flip: true },
+    mobile: { arrow: 'wave', target: 'turret', x: 0.3, flip: true, to: [-4, 24], approach: -62 },
   },
   {
     arrow: 'under', target: 'nose', from: { ax: 0, dx: 23, dy: 18 }, to: [-41, 65],
-    mobile: { arrow: 'sweep', target: 'nose', x: 0.62 },
+    mobile: { arrow: 'sweep', target: 'turret', x: 0.62, to: [2, 24], approach: -72 },
   },
   {
     arrow: 'loopDown', target: 'wingStbd', from: { ax: 0.56, dy: 52 }, to: [-16, 66],
-    mobile: { arrow: 'loop', target: 'turret', x: 0.4 },
+    // Wing tip, as on desktop: the wing lies between the text and the turret, so the turret can't be reached cleanly.
+    mobile: { arrow: 'loop', target: 'wingStbd', x: 0.12, to: [-2, 16], approach: -58 },
   },
   { underline: 'double' },
 ];
@@ -293,9 +300,7 @@ function drawDoodles(step, { animate = true } = {}) {
     if (mobileLayout) {
       const r = settledRect(slide);
       start = [r.left + r.width * a.x, r.top - 16 * s];
-      const dx = target[0] - start[0], dy = target[1] - start[1], len = Math.hypot(dx, dy);
-      const gap = 18 * s; // stop short of the plane
-      end = [target[0] - (dx / len) * gap, target[1] - (dy / len) * gap];
+      end = [target[0] + a.to[0] * s, target[1] + a.to[1] * s];
     } else {
       const lines = slide.querySelectorAll('.ln > span');
       const r = settledRect(lines[lines.length - 1]);
@@ -304,6 +309,7 @@ function drawDoodles(step, { animate = true } = {}) {
     }
     g.append(arrow(ARROWS[a.arrow], start, end, {
       width: (mobileLayout ? 4 : 7) * s, head: (mobileLayout ? 15 : 26) * s, seed: step * 13, flip: !!a.flip,
+      approach: a.approach ?? null,
     }));
   }
 
@@ -354,36 +360,48 @@ function goTo(i, { instant = false } = {}) {
   }
   flyTo(poses[i], STEP_DURATION, easeInOutCubic, STEP_DIP);
   if (modelReady) stage.boostStart();
-  busy = true;
-  clearTimeout(busyTimer);
-  busyTimer = setTimeout(() => { busy = false; stage.boostEnd(); }, STEP_DURATION * 1000);
+  lockedUntil = performance.now() + STEP_LOCK * 1000;
+  clearTimeout(boostTimer);
+  boostTimer = setTimeout(stage.boostEnd, STEP_DURATION * 1000);
 }
 
 const next = () => goTo(current + 1);
 const prev = () => goTo(current - 1);
 
+// Mouse wheels send discrete notches (±100-ish, or line units): each notch past the lock is a step.
+// Trackpads send a stream that ramps up and ends in a long decaying inertia tail: one step per gesture. A new
+// gesture is a pause, or the stream jumping up again after it had decayed well below its peak (inertia only
+// ever slows down, while the ramp-up at the start of a flick rises from the previous value, not from a lull).
 let wheelAcc = 0;
 let lastWheel = 0;
-let needQuiet = false;
+let gestureUsed = false;
+let gesturePeak = 0;
+let prevAbs = 0;
 window.addEventListener('wheel', (e) => {
   e.preventDefault();
   const now = performance.now();
-  const quiet = now - lastWheel > WHEEL_QUIET_MS;
+  const d = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * window.innerHeight : e.deltaY;
+  const abs = Math.abs(d);
+  const paused = now - lastWheel > WHEEL_NEW_GESTURE_MS;
+  const restarted = abs > prevAbs * 1.5 + 4 && prevAbs < gesturePeak * 0.6;
+  if (paused || restarted) { gestureUsed = false; wheelAcc = 0; gesturePeak = 0; }
+  gesturePeak = Math.max(gesturePeak, abs);
+  prevAbs = abs;
   lastWheel = now;
-  if (busy || !uiReady || menuOpen()) { needQuiet = true; wheelAcc = 0; return; }
-  if (needQuiet && !quiet) return; // inertia tail of the gesture that started the last move
-  needQuiet = false;
-  if (quiet) wheelAcc = 0;
-  wheelAcc += e.deltaY;
-  if (Math.abs(wheelAcc) < WHEEL_THRESHOLD) return;
-  wheelAcc > 0 ? next() : prev();
+  if (locked() || !uiReady || menuOpen()) return;
+
+  const notch = e.deltaMode !== 0 || (abs >= 50 && Number.isInteger(d));
+  if (!notch && gestureUsed) return; // trackpad inertia of a gesture that already moved
+  wheelAcc += d;
+  if (Math.abs(wheelAcc) < WHEEL_THRESHOLD && !notch) return;
+  (notch ? d : wheelAcc) > 0 ? next() : prev();
   wheelAcc = 0;
-  needQuiet = true;
+  gestureUsed = true;
 }, { passive: false });
 
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') setMenu(false);
-  if (busy || !uiReady || menuOpen()) return;
+  if (locked() || !uiReady || menuOpen()) return;
   if (['ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); next(); }
   if (['ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); prev(); }
   if (e.key === 'Home') goTo(0);
@@ -399,7 +417,7 @@ window.addEventListener('pointerup', (e) => {
   if (dragY === null) return;
   const dy = dragY - e.clientY;
   dragY = null;
-  if (busy || !uiReady || menuOpen() || Math.abs(dy) < SWIPE_MIN) return;
+  if (locked() || !uiReady || menuOpen() || Math.abs(dy) < SWIPE_MIN) return;
   dy > 0 ? next() : prev();
 });
 window.addEventListener('pointercancel', () => { dragY = null; });
@@ -415,7 +433,7 @@ document.querySelectorAll('.mmenu a').forEach((a) => a.addEventListener('click',
 window.addEventListener('resize', () => { if (!mobileLayout) setMenu(false); });
 
 document.querySelector('.cue').addEventListener('click', () => {
-  if (busy) return;
+  if (locked()) return;
   current === STEPS - 1 ? goTo(0) : next();
 });
 
