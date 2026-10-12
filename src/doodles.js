@@ -90,8 +90,17 @@ function place(template, start, end) {
   return template.map(([x, y]) => [start[0] + dx * x + nx * y * len, start[1] + dy * x + ny * y * len]);
 }
 
-// Three different arrows for screens 2–4, after the client's hand-drawn examples.
+// Arrows after the client's hand-drawn examples. Desktop screens 2–4 use `dip`, `under` and `loopDown`, traced
+// from the client's red sketches of where each arrow should run; mobile keeps `wave`, `sweep` and `loop`.
 export const ARROWS = {
+  dip: [[0, 0], [0.036, 0.093], [0.105, 0.18], [0.211, 0.22], [0.287, 0.193], [0.346, 0.094], [0.384, 0.064],
+    [0.449, 0.089], [0.543, 0.166], [0.636, 0.189], [0.745, 0.159], [0.867, 0.076], [1, 0]],
+  under: [[0, 0], [0.051, -0.069], [0.136, -0.133], [0.265, -0.187], [0.41, -0.212], [0.552, -0.208], [0.713, -0.171],
+    [0.848, -0.102], [0.935, -0.044], [1, 0]],
+  // Round cursive loop around (0.47, 0.32): enters at the bottom heading on, circles back and crosses its own
+  // entry on the way out, like the sketch.
+  loopDown: [[0, 0], [0.05, 0.3], [0.2, 0.5], [0.36, 0.48], [0.5, 0.44], [0.59, 0.34], [0.56, 0.2], [0.45, 0.17],
+    [0.37, 0.25], [0.38, 0.39], [0.48, 0.52], [0.64, 0.5], [0.81, 0.36], [0.93, 0.16], [1, 0]],
   wave: [[0, 0], [0.1, -0.12], [0.2, -0.13], [0.27, -0.03], [0.34, 0.08], [0.46, 0.09], [0.62, 0.02], [0.82, -0.02], [1, 0]],
   sweep: [[0, 0], [0.3, -0.06], [0.62, -0.07], [0.86, -0.03], [1, 0]],
   loop: [[0, 0], [0.2, 0.04], [0.36, 0.03], [0.47, -0.06], [0.45, -0.17], [0.37, -0.15], [0.36, -0.05], [0.44, 0.03], [0.62, 0.05], [0.82, 0.03], [1, 0]],
@@ -102,7 +111,7 @@ export const ARROWS = {
 export function arrow(template, start, end, { width, head, seed = 7, delay = 0, flip = false }) {
   const g = el('g', {});
   const line = smooth(place(flip ? template.map(([x, y]) => [x, -y]) : template, start, end));
-  const t = stroke(g, line, width, { seed, taper: [0.1, 0.04] }, { delay, duration: 0.42 });
+  const t = stroke(g, line, width, { seed, taper: [0.1, 0.04] }, { delay, duration: 0.6 });
   // Open arrowhead: two short strokes meeting at the tip, angled off the last stretch of the line.
   const tip = line[line.length - 1];
   const back = line[Math.max(line.length - 6, 0)];
@@ -112,7 +121,7 @@ export function arrow(template, start, end, { width, head, seed = 7, delay = 0, 
     const from = [tip[0] + Math.cos(ang) * head, tip[1] + Math.sin(ang) * head];
     const mid = [(from[0] + tip[0]) / 2 + Math.sin(ang) * head * 0.06, (from[1] + tip[1]) / 2 - Math.cos(ang) * head * 0.06];
     stroke(g, smooth([from, mid, tip], 8), width * 0.95, { seed: seed + 10 + i, taper: [0.2, 0.08] },
-      { delay: t - 0.03 + i * 0.04, duration: 0.11 });
+      { delay: t - 0.04 + i * 0.06, duration: 0.16 });
   });
   return g;
 }
@@ -122,7 +131,7 @@ export function underline(x0, x1, y, { width, seed = 3, delay = 0, rise = 0, sag
   const g = el('g', {});
   const len = x1 - x0;
   const pts = [[x0, y], [x0 + len * 0.3, y + len * sag], [x0 + len * 0.7, y + len * sag * 0.6 - rise / 2], [x1, y - rise]];
-  stroke(g, smooth(pts, 18), width, { seed, taper: [0.08, 0.14], wobble: 0.22 }, { delay, duration: 0.3 });
+  stroke(g, smooth(pts, 18), width, { seed, taper: [0.08, 0.14], wobble: 0.22 }, { delay, duration: 0.42 });
   return g;
 }
 

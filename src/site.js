@@ -209,12 +209,24 @@ function renderStepUI(i) {
 // Screens 1 and 5 underline the .mark phrase; screens 2–4 draw an arrow from the text to a point on the plane,
 // each in a different hand. Desktop arrows leave the text sideways; on mobile they rise from the top of the
 // text block. Built from live text rects and the projected target pose, so they fit any window size.
-const PLANE_POINTS = { nose: [2.816, -0.083, 0], turret: [1.496, -0.365, 0] }; // model space
+const PLANE_POINTS = { nose: [2.816, -0.083, 0], turret: [1.496, -0.365, 0], wingStbd: [-0.246, -0.071, 6.476] }; // model space
+// Desktop arrows follow the client's sketches: `from` is relative to the last text line (left + ax × width + dx,
+// bottom + dy), `to` is an offset from the projected plane point — both in mockup px (× --s).
+// Mobile arrows rise from the top of the text block (x = fraction of its width) to the plane point.
 const DOODLES = [
   { underline: 'single' },
-  { arrow: 'wave', target: 'nose', from: 'lastLineEnd', mobileX: 0.3, flip: true }, // bulge below, away from the text
-  { arrow: 'sweep', target: 'nose', from: 'firstLineStart', mobileX: 0.62 },
-  { arrow: 'loop', target: 'turret', from: 'lastLineEnd', mobileX: 0.4 },
+  {
+    arrow: 'dip', target: 'nose', from: { ax: 0.9, dy: 33 }, to: [-95, 47],
+    mobile: { arrow: 'wave', target: 'nose', x: 0.3, flip: true },
+  },
+  {
+    arrow: 'under', target: 'nose', from: { ax: 0, dx: 23, dy: 18 }, to: [-41, 65],
+    mobile: { arrow: 'sweep', target: 'nose', x: 0.62 },
+  },
+  {
+    arrow: 'loopDown', target: 'wingStbd', from: { ax: 0.56, dy: 52 }, to: [-16, 66],
+    mobile: { arrow: 'loop', target: 'turret', x: 0.4 },
+  },
   { underline: 'double' },
 ];
 const DOODLE_DELAY = 0.55; // s after a screen change: right as its text starts to rise
@@ -271,28 +283,27 @@ function drawDoodles(step, { animate = true } = {}) {
     g.append(underline(r.left - fs * 0.04, r.right + fs * 0.03, y, { width: w, seed: step + 3, rise: fs * 0.04 }));
     if (cfg.underline === 'double') {
       g.append(underline(r.left + r.width * 0.07, r.right - r.width * 0.14, y + w * 2.7, {
-        width: w * 0.85, seed: step + 11, delay: 0.15, rise: -fs * 0.02,
+        width: w * 0.85, seed: step + 11, delay: 0.2, rise: -fs * 0.02,
       }));
     }
   } else {
-    const lines = [...slide.querySelectorAll('.ln > span')];
-    let start;
+    const a = mobileLayout ? cfg.mobile : cfg;
+    const target = projectOnPlane(step, a.target);
+    let start, end;
     if (mobileLayout) {
       const r = settledRect(slide);
-      start = [r.left + r.width * cfg.mobileX, r.top - 16 * s];
-    } else if (cfg.from === 'lastLineEnd') {
-      const r = settledRect(lines[lines.length - 1]);
-      start = [r.right + 30 * s, r.top + r.height * 0.58];
+      start = [r.left + r.width * a.x, r.top - 16 * s];
+      const dx = target[0] - start[0], dy = target[1] - start[1], len = Math.hypot(dx, dy);
+      const gap = 18 * s; // stop short of the plane
+      end = [target[0] - (dx / len) * gap, target[1] - (dy / len) * gap];
     } else {
-      const r = settledRect(lines[0]);
-      start = [r.left - 30 * s, r.top + r.height * 0.62];
+      const lines = slide.querySelectorAll('.ln > span');
+      const r = settledRect(lines[lines.length - 1]);
+      start = [r.left + r.width * a.from.ax + (a.from.dx || 0) * s, r.bottom + a.from.dy * s];
+      end = [target[0] + a.to[0] * s, target[1] + a.to[1] * s];
     }
-    const target = projectOnPlane(step, cfg.target);
-    const dx = target[0] - start[0], dy = target[1] - start[1], len = Math.hypot(dx, dy);
-    const gap = (mobileLayout ? 18 : 40) * s; // stop short of the plane
-    const end = [target[0] - (dx / len) * gap, target[1] - (dy / len) * gap];
-    g.append(arrow(ARROWS[cfg.arrow], start, end, {
-      width: (mobileLayout ? 4 : 7) * s, head: (mobileLayout ? 15 : 26) * s, seed: step * 13, flip: !!cfg.flip,
+    g.append(arrow(ARROWS[a.arrow], start, end, {
+      width: (mobileLayout ? 4 : 7) * s, head: (mobileLayout ? 15 : 26) * s, seed: step * 13, flip: !!a.flip,
     }));
   }
 
