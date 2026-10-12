@@ -29,6 +29,9 @@ export default defineConfig(({ mode }) => {
   // GitHub Pages serves the repo under /wilco-defense-concept/; the deploy workflow sets PAGES_BASE.
   return {
     base: process.env.PAGES_BASE || '/',
+    // Build output and source dumps are not app code; watching them crashed the dev server on Windows
+    // (EBUSY) whenever build:offline rewrote dist-offline/.
+    server: { watch: { ignored: ['**/dist/**', '**/dist-offline/**', '**/download/**', '**/video/**', '**/*.zip'] } },
     build: {
       rollupOptions: {
         input: { site: page('index.html'), viewer: page('viewer.html') },

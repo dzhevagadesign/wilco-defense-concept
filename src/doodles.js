@@ -102,7 +102,7 @@ export const ARROWS = {
 export function arrow(template, start, end, { width, head, seed = 7, delay = 0, flip = false }) {
   const g = el('g', {});
   const line = smooth(place(flip ? template.map(([x, y]) => [x, -y]) : template, start, end));
-  const t = stroke(g, line, width, { seed, taper: [0.1, 0.04] }, { delay, duration: 0.85 });
+  const t = stroke(g, line, width, { seed, taper: [0.1, 0.04] }, { delay, duration: 0.42 });
   // Open arrowhead: two short strokes meeting at the tip, angled off the last stretch of the line.
   const tip = line[line.length - 1];
   const back = line[Math.max(line.length - 6, 0)];
@@ -112,7 +112,7 @@ export function arrow(template, start, end, { width, head, seed = 7, delay = 0, 
     const from = [tip[0] + Math.cos(ang) * head, tip[1] + Math.sin(ang) * head];
     const mid = [(from[0] + tip[0]) / 2 + Math.sin(ang) * head * 0.06, (from[1] + tip[1]) / 2 - Math.cos(ang) * head * 0.06];
     stroke(g, smooth([from, mid, tip], 8), width * 0.95, { seed: seed + 10 + i, taper: [0.2, 0.08] },
-      { delay: t - 0.05 + i * 0.08, duration: 0.22 });
+      { delay: t - 0.03 + i * 0.04, duration: 0.11 });
   });
   return g;
 }
@@ -122,7 +122,7 @@ export function underline(x0, x1, y, { width, seed = 3, delay = 0, rise = 0, sag
   const g = el('g', {});
   const len = x1 - x0;
   const pts = [[x0, y], [x0 + len * 0.3, y + len * sag], [x0 + len * 0.7, y + len * sag * 0.6 - rise / 2], [x1, y - rise]];
-  stroke(g, smooth(pts, 18), width, { seed, taper: [0.08, 0.14], wobble: 0.22 }, { delay, duration: 0.6 });
+  stroke(g, smooth(pts, 18), width, { seed, taper: [0.08, 0.14], wobble: 0.22 }, { delay, duration: 0.3 });
   return g;
 }
 

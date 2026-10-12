@@ -217,12 +217,26 @@ const DOODLES = [
   { arrow: 'loop', target: 'turret', from: 'lastLineEnd', mobileX: 0.4 },
   { underline: 'double' },
 ];
-const DOODLE_TEXT_DELAY = 1.4; // s after a screen's text starts revealing, when its rects are final
+const DOODLE_DELAY = 0.55; // s after a screen change: right as its text starts to rise
 
 const doodleLayer = document.querySelector('.doodles');
 let doodleGroup = null;
 let doodleTimer = 0;
 let revealed = false; // text is laid out for real (preloader gone)
+
+// Text rects as they will be once the reveal finishes: undo the line lift (desktop: inner line span inside
+// its .ln mask; mobile: the whole slide), so doodles can be built while the text is still rising.
+function settledRect(node) {
+  const r = node.getBoundingClientRect();
+  let dy = 0;
+  const line = node.closest('.ln');
+  const span = line?.firstElementChild;
+  if (span && getComputedStyle(span).display !== 'inline') {
+    dy += span.getBoundingClientRect().top - line.getBoundingClientRect().top;
+  }
+  if (mobileLayout) dy += new DOMMatrixReadOnly(getComputedStyle(node.closest('.slide')).transform).m42;
+  return { left: r.left, right: r.right, width: r.width, height: r.height, top: r.top - dy, bottom: r.bottom - dy };
+}
 
 function projectOnPlane(step, name) {
   const p = poses[step];
@@ -248,27 +262,29 @@ function drawDoodles(step, { animate = true } = {}) {
 
   if (cfg.underline) {
     const mark = slide.querySelector('.mark');
-    const r = mark.getClientRects()[0];
+    const first = mark.getClientRects()[0]; // first line if the phrase wraps (mobile)
+    const box = settledRect(mark);
+    const r = { left: first.left, right: first.right, height: first.height, bottom: box.top + (first.bottom - mark.getBoundingClientRect().top) };
     const fs = parseFloat(getComputedStyle(mark).fontSize);
     const w = Math.max(fs * 0.085, 3.2);
     const y = r.bottom - r.height * 0.14;
     g.append(underline(r.left - fs * 0.04, r.right + fs * 0.03, y, { width: w, seed: step + 3, rise: fs * 0.04 }));
     if (cfg.underline === 'double') {
       g.append(underline(r.left + r.width * 0.07, r.right - r.width * 0.14, y + w * 2.7, {
-        width: w * 0.85, seed: step + 11, delay: 0.3, rise: -fs * 0.02,
+        width: w * 0.85, seed: step + 11, delay: 0.15, rise: -fs * 0.02,
       }));
     }
   } else {
     const lines = [...slide.querySelectorAll('.ln > span')];
     let start;
     if (mobileLayout) {
-      const r = slide.getBoundingClientRect();
+      const r = settledRect(slide);
       start = [r.left + r.width * cfg.mobileX, r.top - 16 * s];
     } else if (cfg.from === 'lastLineEnd') {
-      const r = lines[lines.length - 1].getBoundingClientRect();
+      const r = settledRect(lines[lines.length - 1]);
       start = [r.right + 30 * s, r.top + r.height * 0.58];
     } else {
-      const r = lines[0].getBoundingClientRect();
+      const r = settledRect(lines[0]);
       start = [r.left - 30 * s, r.top + r.height * 0.62];
     }
     const target = projectOnPlane(step, cfg.target);
@@ -316,8 +332,8 @@ function goTo(i, { instant = false } = {}) {
   current = i;
   renderStepUI(i);
   clearDoodles();
-  // Arrows point at the plane, so they are drawn once it has arrived.
-  if (revealed) scheduleDoodles(i, instant ? DOODLE_TEXT_DELAY : Math.max(STEP_DURATION, DOODLE_TEXT_DELAY));
+  // Arrows aim at the target pose, so they can draw while the plane is still settling in.
+  if (revealed) scheduleDoodles(i, DOODLE_DELAY);
 
   if (instant) {
     base.pos.copy(poses[i].pos);
@@ -461,7 +477,7 @@ Promise.all([fontsReady, modelLoad]).then(async ([, ok]) => {
   await new Promise((r) => setTimeout(r, 350)); // content has lifted off; start the page under the fade
   root.classList.remove('is-loading');
   revealed = true;
-  scheduleDoodles(current, DOODLE_TEXT_DELAY + 0.2);
+  scheduleDoodles(current, DOODLE_DELAY);
   parked = false;
   if (ok && !startStep) { // deep link (?step=N) shows the pose straight away
     flyTo(poses[current], ENTRY_DURATION, easeOutCubic);
